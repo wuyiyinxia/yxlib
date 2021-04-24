@@ -3,7 +3,8 @@ package sock
 import (
 	"net"
 	"time"
-	"yxlib/util"
+
+	"github.com/wuyiyinxia/yxlib/util"
 )
 
 const (
