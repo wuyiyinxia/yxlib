@@ -136,7 +136,7 @@ func (m *SockMgr) handleSend(wrap *SockPackWrap) {
 
 func (m *SockMgr) handleRecv(wrap *SockPackWrap) {
 	if m.listener != nil {
-		m.listener.OnHandlePack(wrap.Conn, wrap.Pack)
+		m.listener.OnHandlePack(wrap.Pack, wrap.Conn)
 	}
 }
 

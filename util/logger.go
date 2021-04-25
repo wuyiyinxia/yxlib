@@ -102,12 +102,17 @@ func (l *logger) StopDump() {
 func (l *logger) dump() {
 	for {
 		bEnd, err := l.dumpToFile()
-		l.renameDumpFile()
+		if err != nil {
+			fmt.Println("dump log to file error: ", err)
+		}
+
+		err = l.renameDumpFile()
+		if err != nil {
+			fmt.Println("rename dump file error: ", err)
+		}
 
 		if bEnd {
-			if err == nil {
-				l.stopSuccEvt <- true
-			}
+			l.stopSuccEvt <- true
 			break
 		}
 	}
@@ -127,11 +132,16 @@ func (l *logger) dumpToFile() (bool, error) {
 	for {
 		select {
 		case log := <-l.logs:
-			w.WriteString(log)
+			_, err := w.WriteString(log)
+			if err != nil {
+				fmt.Println("dumpToFile WriteString error: ", err)
+			}
 			w.Flush()
 
 			fs, err := os.Stat(l.dumpFile)
-			if err == nil && fs.Size() >= int64(l.dumpFileSize) {
+			if err != nil {
+				fmt.Println("dumpToFile wos.Stat error: ", err)
+			} else if fs.Size() >= int64(l.dumpFileSize) {
 				goto Exit0
 			}
 
@@ -152,7 +162,10 @@ func (l *logger) dumpAll(w *bufio.Writer) {
 	for {
 		select {
 		case log := <-l.logs:
-			w.WriteString(log)
+			_, err := w.WriteString(log)
+			if err != nil {
+				fmt.Println("dumpAll WriteString error: ", err)
+			}
 
 		default:
 			goto Exit0
@@ -163,12 +176,12 @@ Exit0:
 	return
 }
 
-func (l *logger) renameDumpFile() {
+func (l *logger) renameDumpFile() error {
 	dir := path.Dir(l.dumpFile)
 	name := path.Base(l.dumpFile)
 	ext := path.Ext(name)
 	nameOnly := strings.TrimSuffix(name, ext)
 	timeStr := GetFullTimeString("_%s%s%s_%s%s%s")
 	newName := path.Join(dir, nameOnly+timeStr+ext)
-	os.Rename(l.dumpFile, newName)
+	return os.Rename(l.dumpFile, newName)
 }
