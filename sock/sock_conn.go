@@ -26,7 +26,8 @@ type SockConn struct {
 	closeReadEvt  chan bool
 	closeWriteEvt chan bool
 	exitEvt       chan bool
-	packer        SockPakcer
+	packer        SockPacker
+	unpacker      SockUnpacker
 }
 
 func NewSockConn(conn net.Conn, requestQue chan *SockPackWrap) *SockConn {
@@ -39,18 +40,27 @@ func NewSockConn(conn net.Conn, requestQue chan *SockPackWrap) *SockConn {
 		closeWriteEvt: make(chan bool, 1),
 		exitEvt:       make(chan bool, 1),
 		packer:        nil,
+		unpacker:      nil,
 	}
 
 	return c
 }
 
-func (c *SockConn) SetPacker(packer SockPakcer) {
+func (c *SockConn) SetPacker(packer SockPacker) {
 	c.packer = packer
+}
+
+func (c *SockConn) SetUnpacker(unpacker SockUnpacker) {
+	c.unpacker = unpacker
 }
 
 func (c *SockConn) Start() {
 	if c.packer == nil {
 		c.packer = NewDefSockPacker()
+	}
+
+	if c.unpacker == nil {
+		c.unpacker = NewDefSockUnpacker()
 	}
 
 	go c.read()
@@ -90,7 +100,7 @@ func (c *SockConn) read() {
 		}
 
 		// read header
-		len, err := c.packer.ReadHeader(c.headerBuff, c)
+		len, err := c.unpacker.ReadHeader(c.headerBuff, c)
 		if err != nil {
 			fmt.Println("read data len error: ", err)
 			break
@@ -109,7 +119,7 @@ func (c *SockConn) read() {
 		}
 
 		// unpack
-		p, err := c.packer.Unpack(buff, c)
+		p, err := c.unpacker.Unpack(buff, c)
 		if err != nil {
 			fmt.Println("unpack error: ", err)
 			break

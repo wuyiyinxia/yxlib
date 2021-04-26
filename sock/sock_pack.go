@@ -111,25 +111,31 @@ func NewSockPackWrap(pack *SockPack, c net.Conn) *SockPackWrap {
 }
 
 /*
- * @interface SockPakcer
+ * @interface SockUnpacker
  */
-type SockPakcer interface {
+type SockUnpacker interface {
 	ReadHeader(buff []byte, c *SockConn) (uint16, error)
 	Unpack(buff []byte, c *SockConn) (*SockPack, error)
+}
+
+/*
+ * @interface SockPacker
+ */
+type SockPacker interface {
 	Pack(pack *SockPack, c *SockConn) ([]byte, error)
 }
 
 /*
- * @struct DefSockPacker
+ * @struct DefSockUnpacker
  */
-type DefSockPacker struct {
+type DefSockUnpacker struct {
 }
 
-func NewDefSockPacker() *DefSockPacker {
-	return &DefSockPacker{}
+func NewDefSockUnpacker() *DefSockUnpacker {
+	return &DefSockUnpacker{}
 }
 
-func (p *DefSockPacker) ReadHeader(buff []byte, c *SockConn) (uint16, error) {
+func (p *DefSockUnpacker) ReadHeader(buff []byte, c *SockConn) (uint16, error) {
 	buffLen := len(buff)
 	_, err := c.readToBuff(buff)
 	if err != nil {
@@ -162,7 +168,7 @@ func (p *DefSockPacker) ReadHeader(buff []byte, c *SockConn) (uint16, error) {
 	return dataLen, nil
 }
 
-func (p *DefSockPacker) Unpack(buff []byte, c *SockConn) (*SockPack, error) {
+func (p *DefSockUnpacker) Unpack(buff []byte, c *SockConn) (*SockPack, error) {
 	pack := NewSockPack()
 	headerBuff := buff[SOCK_PACK_MARK_LEN:SOCK_PACK_HEADER_LEN]
 	buffWrap := bytes.NewBuffer(headerBuff)
@@ -209,6 +215,16 @@ func (p *DefSockPacker) Unpack(buff []byte, c *SockConn) (*SockPack, error) {
 	pack.RawBuff = buff
 
 	return pack, nil
+}
+
+/*
+ * @struct DefSockPacker
+ */
+type DefSockPacker struct {
+}
+
+func NewDefSockPacker() *DefSockPacker {
+	return &DefSockPacker{}
 }
 
 func (p *DefSockPacker) Pack(pack *SockPack, c *SockConn) ([]byte, error) {
