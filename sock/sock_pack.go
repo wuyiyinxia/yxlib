@@ -1,6 +1,9 @@
 package sock
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
 	"net"
 )
 
@@ -105,4 +108,170 @@ func NewSockPackWrap(pack *SockPack, c net.Conn) *SockPackWrap {
 	}
 
 	return wrap
+}
+
+/*
+ * @interface SockPakcer
+ */
+type SockPakcer interface {
+	ReadHeader(buff []byte, c *SockConn) (uint16, error)
+	Unpack(buff []byte, c *SockConn) (*SockPack, error)
+	Pack(pack *SockPack, c *SockConn) ([]byte, error)
+}
+
+/*
+ * @struct DefSockPacker
+ */
+type DefSockPacker struct {
+}
+
+func NewDefSockPacker() *DefSockPacker {
+	return &DefSockPacker{}
+}
+
+func (p *DefSockPacker) ReadHeader(buff []byte, c *SockConn) (uint16, error) {
+	buffLen := len(buff)
+	_, err := c.readToBuff(buff)
+	if err != nil {
+		return 0, err
+	}
+
+	// check package mark
+	var mark uint16 = 0
+	markBuff := buff[:SOCK_PACK_MARK_LEN]
+	buffWrap := bytes.NewBuffer(markBuff)
+	err = binary.Read(buffWrap, binary.BigEndian, &mark)
+	if err != nil {
+		return 0, err
+	}
+
+	if mark != GetPackMark() {
+		err = errors.New("wrong start mark")
+		return 0, err
+	}
+
+	// get data len
+	var dataLen uint16 = 0
+	dataLenBuff := buff[buffLen-2:]
+	buffWrap = bytes.NewBuffer(dataLenBuff)
+	err = binary.Read(buffWrap, binary.BigEndian, &dataLen)
+	if err != nil {
+		return 0, err
+	}
+
+	return dataLen, nil
+}
+
+func (p *DefSockPacker) Unpack(buff []byte, c *SockConn) (*SockPack, error) {
+	pack := NewSockPack()
+	headerBuff := buff[SOCK_PACK_MARK_LEN:SOCK_PACK_HEADER_LEN]
+	buffWrap := bytes.NewBuffer(headerBuff)
+
+	// cmd
+	err := binary.Read(buffWrap, binary.BigEndian, &pack.Cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// src
+	err = binary.Read(buffWrap, binary.BigEndian, &pack.SrcEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buffWrap, binary.BigEndian, &pack.SrcNo)
+	if err != nil {
+		return nil, err
+	}
+
+	// dst
+	err = binary.Read(buffWrap, binary.BigEndian, &pack.DstEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buffWrap, binary.BigEndian, &pack.DstNo)
+	if err != nil {
+		return nil, err
+	}
+
+	// data len
+	err = binary.Read(buffWrap, binary.BigEndian, &pack.DataLen)
+	if err != nil {
+		return nil, err
+	}
+
+	// data
+	if pack.DataLen > 0 {
+		pack.Data = buff[SOCK_PACK_HEADER_LEN:]
+	}
+
+	pack.RawBuff = buff
+
+	return pack, nil
+}
+
+func (p *DefSockPacker) Pack(pack *SockPack, c *SockConn) ([]byte, error) {
+	if pack.RawBuff != nil {
+		return pack.RawBuff, nil
+	}
+
+	var dataLen uint16 = 0
+	if pack.Data != nil {
+		dataLen = uint16(len(pack.Data))
+	}
+
+	buff := make([]byte, SOCK_PACK_HEADER_LEN+dataLen)
+	buffWrap := bytes.NewBuffer(buff)
+
+	// mark
+	var mark uint16 = GetPackMark()
+	err := binary.Write(buffWrap, binary.BigEndian, &mark)
+	if err != nil {
+		return nil, err
+	}
+
+	// cmd
+	err = binary.Write(buffWrap, binary.BigEndian, &pack.Cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// src
+	var tmpEnd uint8 = uint8(pack.SrcEnd)
+	err = binary.Write(buffWrap, binary.BigEndian, &tmpEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(buffWrap, binary.BigEndian, &pack.SrcNo)
+	if err != nil {
+		return nil, err
+	}
+
+	// dst
+	tmpEnd = uint8(pack.DstEnd)
+	err = binary.Write(buffWrap, binary.BigEndian, &tmpEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(buffWrap, binary.BigEndian, &pack.DstNo)
+	if err != nil {
+		return nil, err
+	}
+
+	// data len
+	err = binary.Write(buffWrap, binary.BigEndian, &dataLen)
+	if err != nil {
+		return nil, err
+	}
+
+	// data
+	if dataLen > 0 {
+		subBuff := buff[SOCK_PACK_HEADER_LEN:]
+		copy(subBuff, pack.Data)
+	}
+
+	return buff, nil
 }
