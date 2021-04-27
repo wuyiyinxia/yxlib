@@ -48,6 +48,15 @@ func (m *SockMgr) SetListener(l SockListener) {
 	m.listener = l
 }
 
+func (m *SockMgr) SetHeaderProcessor(headerProcessor SockHeaderProcessor, c net.Conn) {
+	conn := m.mapConn[c]
+	if conn == nil {
+		return
+	}
+
+	conn.SetHeaderProcessor(headerProcessor)
+}
+
 func (m *SockMgr) addConn(c net.Conn) error {
 	var err error = nil
 	if len(m.stopAddEvt) == 0 {

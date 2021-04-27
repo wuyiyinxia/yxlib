@@ -106,3 +106,8 @@ func NewSockPackWrap(pack *SockPack, c net.Conn) *SockPackWrap {
 
 	return wrap
 }
+
+type SockHeaderProcessor interface {
+	ReadHeader(buff []byte) (uint16, error)
+	WriteHeader(buff []byte) error
+}

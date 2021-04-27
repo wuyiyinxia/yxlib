@@ -21,24 +21,26 @@ var (
 )
 
 type SockConn struct {
-	conn          net.Conn
-	headerBuff    []byte
-	requestQue    chan *SockPackWrap
-	responeQue    chan *SockPack
-	closeReadEvt  chan bool
-	closeWriteEvt chan bool
-	exitEvt       chan bool
+	conn            net.Conn
+	headerBuff      []byte
+	requestQue      chan *SockPackWrap
+	responeQue      chan *SockPack
+	closeReadEvt    chan bool
+	closeWriteEvt   chan bool
+	exitEvt         chan bool
+	headerProcessor SockHeaderProcessor
 }
 
 func NewSockConn(conn net.Conn, requestQue chan *SockPackWrap) *SockConn {
 	c := &SockConn{
-		conn:          conn,
-		headerBuff:    make([]byte, SOCK_PACK_HEADER_LEN),
-		requestQue:    requestQue,
-		responeQue:    make(chan *SockPack, SOCK_MAX_RESP_QUE),
-		closeReadEvt:  make(chan bool, 1),
-		closeWriteEvt: make(chan bool, 1),
-		exitEvt:       make(chan bool, 1),
+		conn:            conn,
+		headerBuff:      make([]byte, SOCK_PACK_HEADER_LEN),
+		requestQue:      requestQue,
+		responeQue:      make(chan *SockPack, SOCK_MAX_RESP_QUE),
+		closeReadEvt:    make(chan bool, 1),
+		closeWriteEvt:   make(chan bool, 1),
+		exitEvt:         make(chan bool, 1),
+		headerProcessor: nil,
 	}
 
 	return c
@@ -54,6 +56,10 @@ func (c *SockConn) Stop() {
 		fmt.Println("stop connect: ", c.conn.RemoteAddr())
 		c.closeReadEvt <- true
 	}
+}
+
+func (c *SockConn) SetHeaderProcessor(headerProcessor SockHeaderProcessor) {
+	c.headerProcessor = headerProcessor
 }
 
 func (c *SockConn) CanRemove() bool {
@@ -82,7 +88,14 @@ func (c *SockConn) read() {
 		}
 
 		// read header
-		len, err := c.readHeader(c.headerBuff)
+		var len uint16 = 0
+		var err error = nil
+		if c.headerProcessor != nil {
+			len, err = c.headerProcessor.ReadHeader(c.headerBuff)
+		} else {
+			len, err = c.readHeader(c.headerBuff)
+		}
+
 		if err != nil {
 			fmt.Println("read data len error: ", err)
 			break
@@ -308,6 +321,33 @@ func (c *SockConn) writePack(p *SockPack) error {
 		return err
 	}
 
+	if c.headerProcessor != nil {
+		err = c.headerProcessor.WriteHeader(buff[:SOCK_PACK_HEADER_LEN])
+	} else {
+		err = c.writeHeader(buff[:SOCK_PACK_HEADER_LEN])
+	}
+
+	if err != nil {
+		return err
+	}
+
+	err = c.writeData(buff[SOCK_PACK_HEADER_LEN:])
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *SockConn) writeHeader(buff []byte) error {
+	return c.writeBuff(buff)
+}
+
+func (c *SockConn) writeData(buff []byte) error {
+	return c.writeBuff(buff)
+}
+
+func (c *SockConn) writeBuff(buff []byte) error {
 	buffLen := len(buff)
 	totalSize, err := c.conn.Write(buff)
 	if err == nil && totalSize < buffLen {
