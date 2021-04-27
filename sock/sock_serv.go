@@ -63,7 +63,7 @@ func (s *SockServ) accept() error {
 	}
 
 	if s.mgr != nil {
-		err = s.mgr.AddConn(c)
+		err = s.mgr.addConn(c)
 		if err != nil {
 			return err
 		}

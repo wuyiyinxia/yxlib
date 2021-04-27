@@ -48,7 +48,7 @@ func (m *SockMgr) SetListener(l SockListener) {
 	m.listener = l
 }
 
-func (m *SockMgr) AddConn(c net.Conn) error {
+func (m *SockMgr) addConn(c net.Conn) error {
 	var err error = nil
 	if len(m.stopAddEvt) == 0 {
 		m.connAddQue <- c

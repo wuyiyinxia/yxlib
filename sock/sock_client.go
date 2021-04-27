@@ -29,7 +29,7 @@ func (c *SockClient) Connect(network string, address string, timeoutSec int64) (
 	}
 
 	if c.mgr != nil {
-		err = c.mgr.AddConn(conn)
+		err = c.mgr.addConn(conn)
 		if err != nil {
 			util.Logger.E(LOG_TAG_SC, "add conn error:", err)
 			return nil, err
